@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Trade Alert Scanner
-Watches a list of coins across multiple timeframes on Bybit and sends a
+Watches a list of coins across multiple timeframes on Binance and sends a
 Telegram alert ONLY when a setup qualifies under the trading-chart-analyst rules.
 
 Rules enforced (mirrors the skill):
@@ -27,8 +27,8 @@ COINS = [
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "LTCUSDT",
 ]
 
-# Bybit interval codes: 15 = 15m, 60 = 1h, 240 = 4h
-TIMEFRAMES = {"15m": "15", "1h": "60", "4h": "240"}
+# Binance interval codes
+TIMEFRAMES = {"15m": "15m", "1h": "1h", "4h": "4h"}
 
 ACCOUNT_USDT = float(os.getenv("ACCOUNT_USDT", "100"))
 RISK_PCT = 0.02          # 2% max risk
@@ -38,26 +38,22 @@ MIN_RR = 1.5             # minimum reward:risk
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-BYBIT_KLINE = "https://api.bybit.com/v5/market/kline"
+BINANCE_KLINE = "https://api.binance.com/api/v3/klines"
 
 
 # ---------------- DATA ----------------
 def get_candles(symbol, interval, limit=120):
-    """Fetch candles from Bybit public API. No key needed."""
-    params = {"category": "linear", "symbol": symbol,
-              "interval": interval, "limit": limit}
-    r = requests.get(BYBIT_KLINE, params=params, timeout=15)
+    """Fetch candles from Binance public API. No key needed."""
+    params = {"symbol": symbol, "interval": interval, "limit": limit}
+    r = requests.get(BINANCE_KLINE, params=params, timeout=15)
     r.raise_for_status()
-    data = r.json()
-    if data.get("retCode") != 0:
-        raise RuntimeError(f"{symbol} {interval}: {data.get('retMsg')}")
-    rows = data["result"]["list"]  # newest first
+    rows = r.json()
     df = pd.DataFrame(rows, columns=[
-        "ts", "open", "high", "low", "close", "volume", "turnover"])
+        "ts", "open", "high", "low", "close", "volume",
+        "close_ts", "quote_vol", "trades", "taker_base", "taker_quote", "ignore"])
     for c in ["open", "high", "low", "close"]:
         df[c] = df[c].astype(float)
-    df = df.iloc[::-1].reset_index(drop=True)  # oldest first
-    return df
+    return df  # already oldest first
 
 
 def add_mas(df):
@@ -86,21 +82,18 @@ def analyze(symbol, tf_label, df):
     direction = "LONG" if stacked_up else "SHORT"
 
     # --- Step 3: Entry trigger (pullback to MA7/MA14 + rejection) ---
-    # Did the recent candle wick into MA7 or MA14 and close back in trend dir?
     touched = (min(prev["low"], last["low"]) <= last["ma7"] <= max(prev["high"], last["high"])) or \
               (min(prev["low"], last["low"]) <= last["ma14"] <= max(prev["high"], last["high"]))
     if not touched:
         return None
 
     if direction == "LONG":
-        # rejection: lower wick + green close, closing above MA7
         candle_body_ok = last["close"] > last["open"]
         lower_wick = (min(last["open"], last["close"]) - last["low"])
         upper_wick = (last["high"] - max(last["open"], last["close"]))
         rejection = lower_wick > upper_wick and last["close"] > last["ma7"]
         if not (candle_body_ok and rejection):
             return None
-        # swing low for stop = lowest low of last 5 candles
         swing = df["low"].iloc[-6:-1].min()
         stop = min(swing, last["low"]) * 0.999
         risk_per_unit = price - stop
@@ -123,7 +116,7 @@ def analyze(symbol, tf_label, df):
         return None
 
     # --- Step 4: Reward:Risk check ---
-    rr = 1.5  # by construction TP1 is 1.5R; gate stays for safety
+    rr = 1.5  # by construction TP1 is 1.5R
     if rr < MIN_RR:
         return None
 
@@ -136,7 +129,7 @@ def analyze(symbol, tf_label, df):
     leverage = notional / ACCOUNT_USDT
     if leverage > MAX_LEVERAGE:
         leverage = MAX_LEVERAGE
-        notional = ACCOUNT_USDT * MAX_LEVERAGE  # cap notional, smaller position
+        notional = ACCOUNT_USDT * MAX_LEVERAGE
 
     return {
         "symbol": symbol, "tf": tf_label, "direction": direction,
@@ -155,19 +148,19 @@ def build_message(plan):
     d = plan
     return (
         f"\U0001F6A8 *TRADE QUALIFIED*\n"
-        f"`{d['symbol']}`  \u2022  *{d['tf']}*  \u2022  *{d['direction']}*\n\n"
+        f"`{d['symbol']}`  •  *{d['tf']}*  •  *{d['direction']}*\n\n"
         f"\U0001F3AF *PLAN*\n"
-        f"\u2022 Entry: `{fmt(d['entry'])}`\n"
-        f"\u2022 Stop:  `{fmt(d['stop'])}`  (\u2212{d['stop_pct']:.2f}%)\n"
-        f"\u2022 TP1 (1.5R): `{fmt(d['tp1'])}`  \u2014 close 50%, stop\u2192BE\n"
-        f"\u2022 TP2 (3R):   `{fmt(d['tp2'])}`  \u2014 trail rest\n"
-        f"\u2022 R:R: 1.5:1 (TP1) / 3:1 (TP2)\n\n"
+        f"• Entry: `{fmt(d['entry'])}`\n"
+        f"• Stop:  `{fmt(d['stop'])}`  (−{d['stop_pct']:.2f}%)\n"
+        f"• TP1 (1.5R): `{fmt(d['tp1'])}`  — close 50%, stop→BE\n"
+        f"• TP2 (3R):   `{fmt(d['tp2'])}`  — trail rest\n"
+        f"• R:R: 1.5:1 (TP1) / 3:1 (TP2)\n\n"
         f"\U0001F4B0 *SIZE*\n"
-        f"\u2022 Account: {ACCOUNT_USDT:.0f} USDT\n"
-        f"\u2022 Max loss: {d['risk_amount']:.2f} USDT (2%)\n"
-        f"\u2022 Notional: {d['notional']:.2f} USDT\n"
-        f"\u2022 Leverage: {d['leverage']:.2f}x (\u22643x)\n\n"
-        f"\u26A0\uFE0F Not financial advice. One TF only \u2014 no order book/funding/macro. "
+        f"• Account: {ACCOUNT_USDT:.0f} USDT\n"
+        f"• Max loss: {d['risk_amount']:.2f} USDT (2%)\n"
+        f"• Notional: {d['notional']:.2f} USDT\n"
+        f"• Leverage: {d['leverage']:.2f}x (≤3x)\n\n"
+        f"⚠️ Not financial advice. One TF only — no order book/funding/macro. "
         f"You own the trade."
     )
 

@@ -1,20 +1,7 @@
 #!/usr/bin/env python3
-"""
-Trade Alert Scanner
-Watches a list of coins across multiple timeframes on Binance and sends a
-Telegram alert ONLY when a setup qualifies under the trading-chart-analyst rules.
-
-Rules enforced (mirrors the skill):
-- Trend filter: price + MA7/MA14/MA28 must be cleanly stacked (up=LONG, down=SHORT)
-- Entry trigger: pullback to MA7/MA14 + rejection wick + close back in trend direction
-- Risk: 2% account, max 3x leverage, min 1.5:1 reward:risk
-- No qualifying setup => silent (no spam). Only QUALIFIED setups alert.
-
-Config via environment variables (set as GitHub Secrets):
-  TELEGRAM_TOKEN   - your bot token from @BotFather
-  TELEGRAM_CHAT_ID - your chat id
-  ACCOUNT_USDT     - account size, default 100
-"""
+# Scans crypto pairs on Binance US and sends Telegram alerts when a setup qualifies.
+# Setup = stacked MAs + pullback to MA7/14 + rejection wick. Silent otherwise.
+# Env: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, ACCOUNT_USDT
 
 import os
 import time

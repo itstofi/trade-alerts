@@ -38,7 +38,7 @@ MIN_RR = 1.5             # minimum reward:risk
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-BINANCE_KLINE = "https://api.binance.com/api/v3/klines"
+BINANCE_KLINE = "https://api.binance.us/api/v3/klines"
 
 
 # ---------------- DATA ----------------

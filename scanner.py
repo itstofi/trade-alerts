@@ -14,6 +14,7 @@ TIMEFRAMES          = {"15m": "15m", "1h": "1h", "4h": "4h"}
 MIN_SCORE           = 80           # alert threshold 0-100
 VOLUME_SPIKE_MULT   = 2.0          # min RVOL vs 20-candle avg (early filter)
 MAX_ALERTS_PER_RUN  = 5            # send only top N by score per scan
+HEARTBEAT_HOUR      = 8            # UTC hour for daily alive ping (0–23)
 CANDLE_LIMIT        = 100          # candles fetched per request
 ACCOUNT_USDT        = float(os.getenv("ACCOUNT_USDT", "100"))
 RISK_PCT            = 0.02
@@ -437,6 +438,16 @@ def main():
     )
     if sent == 0:
         print("  No setups this scan.")
+
+    # Daily heartbeat — fires once at HEARTBEAT_HOUR UTC (first 15-min window)
+    now = datetime.now(timezone.utc)
+    if now.hour == HEARTBEAT_HOUR and now.minute < 15:
+        status = f"{sent} alert(s) sent this scan." if sent else "No setups this scan."
+        send_telegram(
+            f"🟢 *Scanner alive* — {ts}\n"
+            f"Scanned `{len(symbols)}` pairs × `{len(TIMEFRAMES)}` TFs. {status}"
+        )
+        print("[INFO] Daily heartbeat sent.")
 
 
 if __name__ == "__main__":

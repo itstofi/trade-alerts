@@ -10,9 +10,7 @@ import pandas as pd
 from datetime import datetime, timezone
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-TOP_N_COINS         = 200
 TIMEFRAMES          = {"15m": "15m", "1h": "1h", "4h": "4h"}
-MIN_24H_QUOTE_VOL   = 5_000_000    # $5M minimum daily volume
 MIN_SCORE           = 70           # alert threshold 0-100
 VOLUME_SPIKE_MULT   = 1.5          # min RVOL vs 20-candle avg (early filter)
 MAX_ALERTS_PER_RUN  = 10           # send only top N by score per scan
@@ -26,10 +24,44 @@ REQUEST_TIMEOUT     = 15
 
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-BINANCE_BASE     = "https://api.binance.us"
+
+# Updated at startup by detect_exchange() — do not set these manually
+BINANCE_BASE       = "https://api.binance.com"
+MIN_24H_QUOTE_VOL  = 5_000_000
+TOP_N_COINS        = 200
 
 STABLECOINS = {"USDC", "BUSD", "TUSD", "DAI", "FDUSD", "USDP", "USDD", "FRAX"}
 SKIP_TOKENS = {"UP", "DOWN", "BULL", "BEAR"}
+
+# Ordered list of (base_url, min_vol, max_coins) — first accessible one wins
+_EXCHANGE_OPTS = [
+    ("https://api.binance.com", 5_000_000, 200),  # global Binance — 600+ pairs
+    ("https://api.binance.us",  10_000,    50),   # US fallback — ~25 active pairs
+]
+
+
+# ─── EXCHANGE DETECTION ───────────────────────────────────────────────────────
+def detect_exchange():
+    """Try each Binance endpoint; return the first that responds 200."""
+    global BINANCE_BASE, MIN_24H_QUOTE_VOL, TOP_N_COINS
+    for base, min_vol, max_coins in _EXCHANGE_OPTS:
+        try:
+            r = requests.get(
+                f"{base}/api/v3/ticker/price",
+                params={"symbol": "BTCUSDT"},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                BINANCE_BASE      = base
+                MIN_24H_QUOTE_VOL = min_vol
+                TOP_N_COINS       = max_coins
+                print(f"[INFO] Exchange: {base}  |  min_vol=${min_vol:,}  |  top_n={max_coins}")
+                return
+            print(f"[INFO] {base} → HTTP {r.status_code}, trying next...")
+        except Exception as e:
+            print(f"[INFO] {base} unreachable: {e}")
+    # all failed — keep defaults (Binance.com) and let errors surface naturally
+    print("[WARN] All exchange endpoints failed probe; proceeding with defaults")
 
 
 # ─── SYMBOLS ──────────────────────────────────────────────────────────────────
@@ -349,6 +381,8 @@ def analyze(symbol, tf_label, interval):
 def main():
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     print(f"── Scan started {ts} ──")
+
+    detect_exchange()
 
     try:
         symbols = get_top_symbols()

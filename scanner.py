@@ -11,9 +11,9 @@ from datetime import datetime, timezone
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 TIMEFRAMES          = {"15m": "15m", "1h": "1h", "4h": "4h"}
-MIN_SCORE           = 70           # alert threshold 0-100
-VOLUME_SPIKE_MULT   = 1.5          # min RVOL vs 20-candle avg (early filter)
-MAX_ALERTS_PER_RUN  = 10           # send only top N by score per scan
+MIN_SCORE           = 80           # alert threshold 0-100
+VOLUME_SPIKE_MULT   = 2.0          # min RVOL vs 20-candle avg (early filter)
+MAX_ALERTS_PER_RUN  = 5            # send only top N by score per scan
 CANDLE_LIMIT        = 100          # candles fetched per request
 ACCOUNT_USDT        = float(os.getenv("ACCOUNT_USDT", "100"))
 RISK_PCT            = 0.02
@@ -36,7 +36,7 @@ SKIP_TOKENS = {"UP", "DOWN", "BULL", "BEAR"}
 # Ordered list of (base_url, min_vol, max_coins) — first accessible one wins
 _EXCHANGE_OPTS = [
     ("https://api.binance.com", 5_000_000, 200),  # global Binance — 600+ pairs
-    ("https://api.binance.us",  10_000,    50),   # US fallback — ~25 active pairs
+    ("https://api.binance.us",  25_000,    50),   # US fallback — ~15 active pairs
 ]
 
 
@@ -408,9 +408,16 @@ def main():
                 stats["no_data"] += 1
             time.sleep(API_SLEEP)
 
-    candidates.sort(key=lambda x: x["score"], reverse=True)
+    # Per-run dedup: one alert per symbol (best timeframe wins)
+    best = {}
+    for c in candidates:
+        sym = c["symbol"]
+        if sym not in best or c["score"] > best[sym]["score"]:
+            best[sym] = c
+    top = sorted(best.values(), key=lambda x: x["score"], reverse=True)
+
     sent = 0
-    for c in candidates[:MAX_ALERTS_PER_RUN]:
+    for c in top[:MAX_ALERTS_PER_RUN]:
         msg = build_message(c)
         send_telegram(msg)
         print(

@@ -1,0 +1,1 @@
+"""Trade Alerts scanner package."""

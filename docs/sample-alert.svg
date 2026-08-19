@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="640" viewBox="0 0 900 640" role="img" aria-labelledby="title desc">
+  <title id="title">Illustrative Trade Alerts Telegram message</title>
+  <desc id="desc">A clearly labeled sample bullish volume breakout alert with score, signal, plan, and position size.</desc>
+  <rect width="900" height="640" fill="#0b1220"/>
+  <rect x="110" y="40" width="680" height="560" rx="24" fill="#172033" stroke="#334155" stroke-width="2"/>
+  <rect x="110" y="40" width="680" height="56" rx="24" fill="#f59e0b"/>
+  <rect x="110" y="72" width="680" height="24" fill="#f59e0b"/>
+  <text x="450" y="76" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#111827">SAMPLE ALERT — ILLUSTRATIVE ONLY</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#e2e8f0">
+    <text x="150" y="135" font-size="24" font-weight="700" fill="#4ade80">BULLISH VOLUME BREAKOUT</text>
+    <text x="150" y="170" font-size="19">BTCUSDT · 1h · LONG · Score: 92/100</text>
+    <line x1="150" y1="193" x2="750" y2="193" stroke="#334155"/>
+    <text x="150" y="225" font-size="19" font-weight="700" fill="#7dd3fc">SIGNAL</text>
+    <text x="150" y="257" font-size="17">Price: 100.00 · RVOL: 2.0x</text>
+    <text x="150" y="287" font-size="17">Volume: +100% vs previous 20 closed candles</text>
+    <text x="150" y="317" font-size="17">Why: RVOL · breakout · stacked MAs</text>
+    <text x="150" y="365" font-size="19" font-weight="700" fill="#c4b5fd">PLAN</text>
+    <text x="150" y="397" font-size="17">Entry 100.00   Stop 99.50 (-0.50%)</text>
+    <text x="150" y="427" font-size="17">TP1 100.75 (1.5R)   TP2 101.50 (3R)</text>
+    <text x="150" y="475" font-size="19" font-weight="700" fill="#fda4af">SIZE</text>
+    <text x="150" y="507" font-size="17">Account 100 · Planned loss 1.50 (1.50%) · Budget 2.00</text>
+    <text x="150" y="537" font-size="17">Notional 300 USDT · Leverage 3.00x (capped)</text>
+    <text x="150" y="570" font-size="14" fill="#94a3b8">Experimental signal; confirm independently. Not financial advice.</text>
+  </g>
+</svg>
